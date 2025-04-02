@@ -1,134 +1,206 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import {
+	App,
+	Editor,
+	MarkdownView,
+	Notice,
+	Plugin,
+	PluginSettingTab,
+	Setting,
+} from "obsidian";
 
-// Remember to rename these classes and interfaces!
-
-interface MyPluginSettings {
-	mySetting: string;
+interface UniqueNoteFromSelectionSettings {
+	folderPath: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
-}
+const DEFAULT_SETTINGS: UniqueNoteFromSelectionSettings = {
+	folderPath: "/inbox",
+};
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class UniqueNoteFromSelectionPlugin extends Plugin {
+	settings: UniqueNoteFromSelectionSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
+		// Register the command
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
-			callback: () => {
-				new SampleModal(this.app).open();
-			}
-		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
+			id: "create-new-unique-note-from-selection",
+			name: "Create new unique note from selection",
 			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
-				}
-			}
+				this.createUniqueNoteFromSelection(editor, view);
+			},
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		// Add settings tab
+		this.addSettingTab(
+			new UniqueNoteFromSelectionSettingTab(this.app, this),
+		);
 	}
 
 	onunload() {
-
+		// Nothing specific to clean up
 	}
 
 	async loadSettings() {
-		this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			await this.loadData(),
+		);
 	}
 
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
+
+	async createUniqueNoteFromSelection(editor: Editor, view: MarkdownView) {
+		// Get selected text
+		const selectedText = editor.getSelection();
+
+		if (!selectedText) {
+			new Notice("No text selected");
+			return;
+		}
+
+		// For title and filename, use only the first line of selected text
+		const firstLine = selectedText.split("\n")[0].trim();
+
+		// Generate filename
+		const timestamp = this.getTimestamp();
+		const sanitizedTitle = this.sanitizeTitle(firstLine);
+		const filename = `${timestamp}-${sanitizedTitle}.md`;
+
+		// Normalize folder path
+		let folderPath = this.settings.folderPath;
+		if (folderPath.startsWith("/")) {
+			folderPath = folderPath.substring(1);
+		}
+		if (folderPath.endsWith("/")) {
+			folderPath = folderPath.substring(0, folderPath.length - 1);
+		}
+
+		try {
+			// Make sure folder exists
+			if (folderPath) {
+				await this.ensureFolderExists(folderPath);
+			}
+
+			// Create file path
+			const filePath = folderPath
+				? `${folderPath}/${filename}`
+				: filename;
+
+			// Create file content
+			const content = this.createFileContent(firstLine);
+
+			// Create file
+			await this.app.vault.create(filePath, content);
+
+			// Replace selection with link
+			const linkText = `[${selectedText}](${filePath})`;
+			editor.replaceSelection(linkText);
+
+			// Open the new file
+			const newFile = this.app.vault.getAbstractFileByPath(filePath);
+			if (newFile) {
+				await this.app.workspace.getLeaf().openFile(newFile);
+			}
+
+			new Notice(`Created new note: ${filename}`);
+		} catch (error) {
+			console.error("Error creating new file from selection:", error);
+			new Notice(`Error creating new file: ${error.message}`);
+		}
+	}
+
+	getTimestamp(): string {
+		const now = new Date();
+		return [
+			now.getFullYear(),
+			(now.getMonth() + 1).toString().padStart(2, "0"),
+			now.getDate().toString().padStart(2, "0"),
+			now.getHours().toString().padStart(2, "0"),
+			now.getMinutes().toString().padStart(2, "0"),
+			now.getSeconds().toString().padStart(2, "0"),
+		].join("");
+	}
+
+	sanitizeTitle(title: string): string {
+		// Convert to lowercase, remove special characters, replace spaces with underscores
+		return title
+			.toLowerCase()
+			.replace(/[^\w\s]/g, "")
+			.replace(/\s+/g, "_");
+	}
+
+	async ensureFolderExists(folderPath: string) {
+		// Check if folder exists, create if it doesn't
+		const exists = await this.app.vault.adapter.exists(folderPath);
+		if (!exists) {
+			await this.app.vault.createFolder(folderPath);
+		}
+	}
+
+	createFileContent(title: string): string {
+		// Format date as "YYYY-MM-DD HH:mm:ss" for frontmatter
+		const now = new Date();
+		const formattedDate = [
+			now.getFullYear(),
+			"-",
+			(now.getMonth() + 1).toString().padStart(2, "0"),
+			"-",
+			now.getDate().toString().padStart(2, "0"),
+			" ",
+			now.getHours().toString().padStart(2, "0"),
+			":",
+			now.getMinutes().toString().padStart(2, "0"),
+			":",
+			now.getSeconds().toString().padStart(2, "0"),
+		].join("");
+
+		return `---
+title: ${title}
+date created: ${formattedDate}
+date modified: ${formattedDate}
+tags: []
+note_type:
+  - other
+---
+
+# ${title}`;
+	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+class UniqueNoteFromSelectionSettingTab extends PluginSettingTab {
+	plugin: UniqueNoteFromSelectionPlugin;
 
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: UniqueNoteFromSelectionPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
+		containerEl.createEl("h2", {
+			text: "New File from Selection Settings",
+		});
+
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
-				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
-					await this.plugin.saveSettings();
-				}));
+			.setName("Default folder path")
+			.setDesc(
+				"Enter the path where new files should be created (default: /inbox)",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("/inbox")
+					.setValue(this.plugin.settings.folderPath)
+					.onChange(async (value) => {
+						this.plugin.settings.folderPath = value;
+						await this.plugin.saveSettings();
+					}),
+			);
 	}
 }

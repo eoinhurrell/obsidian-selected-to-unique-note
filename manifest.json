@@ -1,11 +1,10 @@
 {
-	"id": "sample-plugin",
-	"name": "Sample Plugin",
+	"id": "selected-to-unique-note",
+	"name": "To Unique Note",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Demonstrates some of the capabilities of the Obsidian API.",
-	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"description": "Create uniquely named notes with timestamps from selection.",
+	"author": "Eoin H",
+	"authorUrl": "https://github.com/eoinhurrell",
 	"isDesktopOnly": false
 }
