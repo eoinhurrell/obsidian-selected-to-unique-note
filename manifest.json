@@ -1,7 +1,7 @@
 {
 	"id": "selected-to-unique-note",
 	"name": "To Unique Note",
-	"version": "1.0.0",
+	"version": "1.1.0",
 	"minAppVersion": "0.15.0",
 	"description": "Create uniquely named notes with timestamps from selection.",
 	"author": "Eoin H",
