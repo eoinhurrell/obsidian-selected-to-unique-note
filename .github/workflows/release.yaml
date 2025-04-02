@@ -67,15 +67,15 @@ jobs:
 
                   # Create zip file
                   cd release
-                  zip -r obsidian-unique-wikilink-$VERSION.zip ./*
-                  mv obsidian-unique-wikilink-$VERSION.zip ../
+                  zip -r obsidian-selected-to-unique-note-$VERSION.zip ./*
+                  mv obsidian-selected-to-unique-note-$VERSION.zip ../
             - name: Create GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  files: obsidian-unique-wikilink-*.zip
+                  files: obsidian-selected-to-unique-note-*.zip
                   name: Version ${{ env.VERSION }}
                   body: |
-                      ## Unique Wikilink v${{ env.VERSION }}
+                      ## Selected to Unique Note v${{ env.VERSION }}
 
                       Please refer to the [changelog](https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md) for details.
 
