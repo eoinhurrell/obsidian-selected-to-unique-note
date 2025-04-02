@@ -6,6 +6,7 @@ import {
 	Plugin,
 	PluginSettingTab,
 	Setting,
+	TFile,
 } from "obsidian";
 
 interface UniqueNoteFromSelectionSettings {
@@ -24,8 +25,8 @@ export default class UniqueNoteFromSelectionPlugin extends Plugin {
 
 		// Register the command
 		this.addCommand({
-			id: "create-new-unique-note-from-selection",
-			name: "Create new unique note from selection",
+			id: "create-unique-note-from-selection",
+			name: "Create unique note from selection",
 			editorCallback: (editor: Editor, view: MarkdownView) => {
 				this.createUniqueNoteFromSelection(editor, view);
 			},
@@ -37,9 +38,7 @@ export default class UniqueNoteFromSelectionPlugin extends Plugin {
 		);
 	}
 
-	onunload() {
-		// Nothing specific to clean up
-	}
+	onunload() {}
 
 	async loadSettings() {
 		this.settings = Object.assign(
@@ -102,7 +101,7 @@ export default class UniqueNoteFromSelectionPlugin extends Plugin {
 
 			// Open the new file
 			const newFile = this.app.vault.getAbstractFileByPath(filePath);
-			if (newFile) {
+			if (newFile instanceof TFile) {
 				await this.app.workspace.getLeaf().openFile(newFile);
 			}
 
